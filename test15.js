@@ -1,0 +1,2 @@
+const url = 'https://steamcommunity.com/market/search/render/?query=&start=0&count=50&search_descriptions=0&sort_column=price&sort_dir=asc&appid=753&category_753_Game[]=tag_app_3751950&category_753_item_class[]=tag_item_class_2&norender=1';
+fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }).then(r => r.json()).then(t => console.log(t.total_count, t.results.length)).catch(e => console.error(e));

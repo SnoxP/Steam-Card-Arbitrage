@@ -1,0 +1,6 @@
+{
+  "name": "Steam Card Arbitrage",
+  "description": "Compara em tempo real o preço de jogos da Steam com o valor de suas cartas, destacando oportunidades de lucro (arbitragem).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
