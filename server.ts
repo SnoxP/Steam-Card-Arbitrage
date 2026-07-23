@@ -52,7 +52,12 @@ async function fetchCheapGamesWithCards() {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  let PORT = 3000;
+  // Railway and Render inject dynamic PORT variables. We use them if detected.
+  // Otherwise, we strictly stick to 3000 for AI Studio compatibility.
+  if (process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_STATIC_URL || process.env.RENDER) {
+    PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+  }
 
   app.use(express.json());
 
