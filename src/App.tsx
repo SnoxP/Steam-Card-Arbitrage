@@ -14,6 +14,9 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentUser, setCurrentUser] = useState<string | null>(localStorage.getItem('username'));
+  const [userHistoryGames, setUserHistoryGames] = useState<AnalysisResult[]>([]);
+
   const [topGames, setTopGames] = useState<AnalysisResult[]>([]);
   const [historyGames, setHistoryGames] = useState<AnalysisResult[]>([]);
   const [scanStats, setScanStats] = useState<{scannedTotal: number, currentScanSize: number} | null>(null);
@@ -57,6 +60,25 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const fetchUserHistory = async () => {
+    if (!currentUser) {
+      setUserHistoryGames([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/user-history/${encodeURIComponent(currentUser)}`);
+      if (res.ok) {
+        setUserHistoryGames(await res.json());
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserHistory();
+  }, [currentUser]);
+
   const presetGames = [
     { id: '508900', name: 'Zup! S' },
     { id: '437580', name: 'Montaro' },
@@ -87,7 +109,11 @@ export default function App() {
     setResult(null);
 
     try {
-      const response = await fetch(`/api/analyze/${appId}`);
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId, username: currentUser })
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -98,6 +124,7 @@ export default function App() {
         setError(data.error);
       } else {
         setResult(data);
+        fetchUserHistory();
       }
     } catch (err: any) {
       setError(err.message || 'Erro de conexão com o servidor.');
@@ -114,6 +141,48 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30">
       <div className="max-w-4xl mx-auto px-4 py-12">
         
+        {/* User Login */}
+        <div className="flex justify-end mb-4">
+          {currentUser ? (
+            <div className="flex items-center gap-3">
+              <span className="text-slate-400 text-sm">Olá, {currentUser}</span>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('username');
+                  setCurrentUser(null);
+                }}
+                className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Sair
+              </button>
+            </div>
+          ) : (
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const user = fd.get('username') as string;
+                if (user && user.trim()) {
+                  localStorage.setItem('username', user.trim());
+                  setCurrentUser(user.trim());
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <input 
+                type="text" 
+                name="username" 
+                placeholder="Seu usuário..." 
+                className="bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-lg text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                required 
+              />
+              <button type="submit" className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                Entrar
+              </button>
+            </form>
+          )}
+        </div>
+
         {/* Header */}
         <header className="mb-12 text-center space-y-4">
           <div className="inline-flex items-center justify-center p-3 bg-indigo-500/10 rounded-2xl mb-4 text-indigo-400">
@@ -243,7 +312,48 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* History */}
+          {/* User Personal History */}
+          {!result && currentUser && userHistoryGames.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 mb-12"
+            >
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <Search className="text-indigo-400" />
+                Seu Histórico de Pesquisas
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {userHistoryGames.map((game: any) => (
+                  <div key={game.appId} className={`bg-slate-900 border ${game.isProfitable ? 'border-emerald-500/20' : 'border-slate-800'} rounded-xl p-3 flex gap-3 cursor-pointer hover:bg-slate-800 transition-colors`} onClick={() => {
+                    setInput(game.appId);
+                    handleAnalyze(game.appId);
+                  }}>
+                    <img 
+                      src={`https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appId}/capsule_sm_120.jpg`} 
+                      alt={game.gameName}
+                      className="rounded-lg w-16 h-fit object-cover opacity-80"
+                    />
+                    <div className="flex-1 overflow-hidden">
+                      <h3 className="font-semibold text-sm text-slate-200 truncate">{game.gameName}</h3>
+                      <div className="text-xs text-slate-500 mt-1">
+                        Pesquisado em: {new Date(game.foundAt).toLocaleString()}
+                      </div>
+                      <div className="text-xs mt-1">
+                        {game.isProfitable ? (
+                          <span className="text-emerald-400 font-medium">Lucro de {formatCurrency((game.expectedDropValueNet || 0) - game.gamePrice, game.currency)}</span>
+                        ) : (
+                          <span className="text-red-400 font-medium">Prejuízo de {formatCurrency(game.gamePrice - (game.expectedDropValueNet || 0), game.currency)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Global History */}
           {!result && historyGames.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}

@@ -202,6 +202,30 @@ async function startServer() {
   // Start the background scanner automatically
   runBackgroundScanner();
 
+  const userHistories: Record<string, any[]> = {};
+
+  app.post('/api/analyze', async (req, res) => {
+    const { appId, username } = req.body;
+    if (!appId) return res.status(400).json({ error: 'App ID is required.' });
+
+    const result = await analyzeGame(appId);
+    if (!result) return res.status(500).json({ error: 'Erro ao analisar o jogo.' });
+    
+    if (username) {
+      if (!userHistories[username]) userHistories[username] = [];
+      userHistories[username] = userHistories[username].filter((g: any) => g.appId !== result.appId);
+      userHistories[username].unshift({ ...result, foundAt: new Date().toISOString() });
+      if (userHistories[username].length > 50) userHistories[username].pop();
+    }
+
+    return res.json(result);
+  });
+
+  app.get('/api/user-history/:username', (req, res) => {
+    const username = req.params.username;
+    res.json(userHistories[username] || []);
+  });
+
   app.get('/api/analyze/:appid', async (req, res) => {
     const result = await analyzeGame(req.params.appid);
     if (!result) return res.status(500).json({ error: 'Erro ao analisar o jogo.' });
