@@ -149,23 +149,6 @@ async function startServer() {
     isScanning = true;
     
     while (true) {
-      // Pause if no active users
-      const now = Date.now();
-      let hasActiveUser = false;
-      for (const [user, lastPing] of activeUsers.entries()) {
-        if (now - lastPing < 60000) {
-          hasActiveUser = true;
-        } else {
-          activeUsers.delete(user);
-        }
-      }
-
-      if (!hasActiveUser) {
-        console.log('No active users. Pausing scan...');
-        await new Promise(r => setTimeout(r, 5000));
-        continue;
-      }
-
       console.log('Fetching new list of cheap games to scan...');
       let scanList: any[] = await fetchCheapGamesWithCards();
       
@@ -234,9 +217,9 @@ async function startServer() {
         await new Promise(r => setTimeout(r, 1500));
       }
       
-      console.log('Finished full scan cycle. Waiting 1 hour before next full list fetch...');
-      // Wait 1 hour before restarting the full scan loop
-      await new Promise(r => setTimeout(r, 60 * 60 * 1000));
+      console.log('Finished full scan cycle. Restarting fetch...');
+      // Wait a few seconds before restarting the full scan loop
+      await new Promise(r => setTimeout(r, 5000));
     }
   }
   
