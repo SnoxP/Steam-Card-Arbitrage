@@ -79,6 +79,20 @@ export default function App() {
     fetchUserHistory();
   }, [currentUser]);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    const ping = () => {
+      fetch('/api/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser })
+      }).catch(() => {});
+    };
+    ping();
+    const interval = setInterval(ping, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const presetGames = [
     { id: '508900', name: 'Zup! S' },
     { id: '437580', name: 'Montaro' },
@@ -145,7 +159,16 @@ export default function App() {
         <div className="flex justify-end mb-4">
           {currentUser ? (
             <div className="flex items-center gap-3">
-              <span className="text-slate-400 text-sm">Olá, {currentUser}</span>
+              <span className="text-slate-400 text-sm hidden sm:inline">Olá, {currentUser}</span>
+              <button 
+                onClick={() => {
+                  document.getElementById('historico')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-sm bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Search size={14} />
+                <span className="hidden sm:inline">Histórico</span>
+              </button>
               <button 
                 onClick={() => {
                   localStorage.removeItem('username');
@@ -197,7 +220,16 @@ export default function App() {
           </p>
         </header>
 
-        {/* Search Box */}
+        {!currentUser ? (
+          <div className="text-center bg-slate-900 border border-slate-800 rounded-3xl p-12 shadow-xl">
+            <h2 className="text-2xl font-bold text-slate-200 mb-4">Faça login para começar</h2>
+            <p className="text-slate-400">
+              Digite o seu nome de usuário no topo da tela para acessar o analisador e monitorar os jogos.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Search Box */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-2 md:p-4 mb-8 shadow-2xl flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
@@ -315,6 +347,7 @@ export default function App() {
           {/* User Personal History */}
           {!result && currentUser && userHistoryGames.length > 0 && (
             <motion.div
+              id="historico"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="mt-8 mb-12"
@@ -532,6 +565,8 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+          </>
+        )}
       </div>
     </div>
   );

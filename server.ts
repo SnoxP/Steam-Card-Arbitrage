@@ -139,14 +139,42 @@ async function startServer() {
     }
   }
 
+  const allAnalyzedAppIds = new Set<string>();
+  const userHistories: Record<string, any[]> = {};
+  const activeUsers = new Map<string, number>();
+
   // Background scanner to maintain cache without rate limits
   async function runBackgroundScanner() {
     if (isScanning) return;
     isScanning = true;
     
     while (true) {
+      // Pause if no active users
+      const now = Date.now();
+      let hasActiveUser = false;
+      for (const [user, lastPing] of activeUsers.entries()) {
+        if (now - lastPing < 60000) {
+          hasActiveUser = true;
+        } else {
+          activeUsers.delete(user);
+        }
+      }
+
+      if (!hasActiveUser) {
+        console.log('No active users. Pausing scan...');
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
+
       console.log('Fetching new list of cheap games to scan...');
-      const scanList = await fetchCheapGamesWithCards();
+      let scanList: any[] = await fetchCheapGamesWithCards();
+      
+      const cheapAppIds = new Set(scanList.map((g: any) => g.appId));
+      for (const appId of allAnalyzedAppIds) {
+        if (!cheapAppIds.has(appId)) {
+          scanList.push(appId);
+        }
+      }
       
       if (scanList.length === 0) {
         await new Promise(r => setTimeout(r, 60000));
@@ -155,32 +183,45 @@ async function startServer() {
 
       currentScanListSize = scanList.length;
       console.log(`Starting scan of ${scanList.length} games...`);
+
       for (const game of scanList) {
         gamesScannedTotal++;
         try {
+          const currentAppId = typeof game === 'string' ? game : game.appId;
           const data = await analyzeGame(game);
-          if (data && data.hasCards && data.isProfitable) {
-            const existingIdx = topGamesCache.findIndex(g => g.appId === game.appId);
-            if (existingIdx >= 0) {
-              topGamesCache[existingIdx] = data;
-            } else {
-              topGamesCache.push(data);
+          
+          if (data) {
+            // Update user histories if the game is there
+            for (const username in userHistories) {
+              const idx = userHistories[username].findIndex((g: any) => g.appId === currentAppId);
+              if (idx >= 0) {
+                userHistories[username][idx] = { ...data, foundAt: userHistories[username][idx].foundAt };
+              }
             }
-            
-            const historyIdx = historyCache.findIndex(g => g.appId === game.appId);
-            if (historyIdx >= 0) {
-              historyCache[historyIdx] = { ...data, foundAt: historyCache[historyIdx].foundAt };
+
+            if (data.hasCards && data.isProfitable) {
+              const existingIdx = topGamesCache.findIndex(g => g.appId === currentAppId);
+              if (existingIdx >= 0) {
+                topGamesCache[existingIdx] = data;
+              } else {
+                topGamesCache.push(data);
+              }
+              
+              const historyIdx = historyCache.findIndex(g => g.appId === currentAppId);
+              if (historyIdx >= 0) {
+                historyCache[historyIdx] = { ...data, foundAt: historyCache[historyIdx].foundAt };
+              } else {
+                historyCache.push({ ...data, foundAt: new Date().toISOString() });
+              }
             } else {
-              historyCache.push({ ...data, foundAt: new Date().toISOString() });
-            }
-          } else if (data) {
-            // Remove if no longer profitable
-            topGamesCache = topGamesCache.filter(g => g.appId !== game.appId);
-            
-            // Update history data if it exists, so we know it's no longer profitable
-            const historyIdx = historyCache.findIndex(g => g.appId === game.appId);
-            if (historyIdx >= 0) {
-              historyCache[historyIdx] = { ...data, foundAt: historyCache[historyIdx].foundAt };
+              // Remove if no longer profitable
+              topGamesCache = topGamesCache.filter(g => g.appId !== currentAppId);
+              
+              // Update history data if it exists, so we know it's no longer profitable
+              const historyIdx = historyCache.findIndex(g => g.appId === currentAppId);
+              if (historyIdx >= 0) {
+                historyCache[historyIdx] = { ...data, foundAt: historyCache[historyIdx].foundAt };
+              }
             }
           }
         } catch (e) {}
@@ -202,11 +243,15 @@ async function startServer() {
   // Start the background scanner automatically
   runBackgroundScanner();
 
-  const userHistories: Record<string, any[]> = {};
-
   app.post('/api/analyze', async (req, res) => {
     const { appId, username } = req.body;
     if (!appId) return res.status(400).json({ error: 'App ID is required.' });
+
+    if (username) {
+      activeUsers.set(username, Date.now());
+    }
+
+    allAnalyzedAppIds.add(appId);
 
     const result = await analyzeGame(appId);
     if (!result) return res.status(500).json({ error: 'Erro ao analisar o jogo.' });
@@ -219,6 +264,14 @@ async function startServer() {
     }
 
     return res.json(result);
+  });
+
+  app.post('/api/ping', (req, res) => {
+    const { username } = req.body;
+    if (username) {
+      activeUsers.set(username, Date.now());
+    }
+    res.json({ ok: true });
   });
 
   app.get('/api/user-history/:username', (req, res) => {
