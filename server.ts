@@ -141,7 +141,6 @@ async function startServer() {
 
   const allAnalyzedAppIds = new Set<string>();
   const userHistories: Record<string, any[]> = {};
-  const activeUsers = new Map<string, number>();
 
   // Background scanner to maintain cache without rate limits
   async function runBackgroundScanner() {
@@ -231,7 +230,6 @@ async function startServer() {
     if (!appId) return res.status(400).json({ error: 'App ID is required.' });
 
     if (username) {
-      activeUsers.set(username, Date.now());
     }
 
     allAnalyzedAppIds.add(appId);
@@ -252,7 +250,6 @@ async function startServer() {
   app.post('/api/ping', (req, res) => {
     const { username } = req.body;
     if (username) {
-      activeUsers.set(username, Date.now());
     }
     res.json({ ok: true });
   });
