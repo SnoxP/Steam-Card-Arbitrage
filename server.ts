@@ -77,8 +77,18 @@ async function startServer() {
         const storeRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&filters=price_overview,basic&cc=BR`, {
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
         });
-        const storeData = await storeRes.json();
-        if (!storeData || !storeData[appId] || !storeData[appId].success) return null;
+        const storeText = await storeRes.text();
+        let storeData;
+        try {
+          storeData = JSON.parse(storeText);
+        } catch (e) {
+          console.error('Failed to parse Steam store response:', storeText.substring(0, 100));
+          return { error: 'A API da Steam bloqueou a requisição da loja (Rate Limit ou Captcha).' };
+        }
+        if (!storeData || !storeData[appId] || !storeData[appId].success) {
+          console.error('Steam store API returned failure for appId:', appId, storeData);
+          return { error: 'Jogo não encontrado na loja da Steam ou bloqueado por região.' };
+        }
 
         gameName = storeData[appId].data.name;
         const priceOverview = storeData[appId].data.price_overview;
@@ -99,10 +109,24 @@ async function startServer() {
 
       const marketUrl = `https://steamcommunity.com/market/search/render/?query=&start=0&count=50&search_descriptions=0&sort_column=price&sort_dir=asc&appid=753&category_753_Game%5B%5D=tag_app_${appId}&category_753_item_class%5B%5D=tag_item_class_2&norender=1&currency=1`;
       const marketRes = await fetch(marketUrl, { headers: { 'User-Agent': 'curl/8.5.0' }});
-      if (!marketRes.ok) return null;
+      if (!marketRes.ok) {
+        console.error('Market API non-OK response', marketRes.status, marketUrl);
+        return { error: `Mercado da Steam indisponível ou rate limit ativo. Status: ${marketRes.status}` };
+      }
 
-      const marketData = await marketRes.json();
-      if (!marketData || !marketData.results) return null;
+      const marketText = await marketRes.text();
+      let marketData;
+      try {
+        marketData = JSON.parse(marketText);
+      } catch (e) {
+        console.error('Failed to parse Steam market response:', marketText.substring(0, 100));
+        return { error: 'O mercado da Steam bloqueou a requisição (Rate Limit ou Captcha).' };
+      }
+      
+      if (!marketData || !marketData.results) {
+        console.error('Market API missing results array', marketData);
+        return { error: 'Estrutura inesperada na resposta do Mercado da Steam.' };
+      }
 
       const allCards = marketData.results.map((r: any) => {
         const usdPrice = r.sell_price / 100;
@@ -134,8 +158,9 @@ async function startServer() {
         numCards, cardsDropped, lowestCardPrice, expectedDropValueGross,
         expectedDropValueNet, isProfitable, cards: allCards
       };
-    } catch (e) {
-      return null;
+    } catch (e: any) {
+      console.error('Error analyzing game', gameParam, e);
+      return { error: `Erro interno no servidor: ${e.message}` };
     }
   }
 
@@ -180,7 +205,7 @@ async function startServer() {
           const currentAppId = typeof game === 'string' ? game : game.appId;
           const data = await analyzeGame(game);
           
-          if (data) {
+          if (data && !data.error) {
             // Update user histories if the game is there
             for (const username in userHistories) {
               const idx = userHistories[username].findIndex((g: any) => g.appId === currentAppId);
@@ -243,13 +268,13 @@ async function startServer() {
     const { appId, username } = req.body;
     if (!appId) return res.status(400).json({ error: 'App ID is required.' });
 
-    if (username) {
-    }
-
     allAnalyzedAppIds.add(appId);
 
     const result = await analyzeGame(appId);
-    if (!result) return res.status(500).json({ error: 'Erro ao analisar o jogo.' });
+    if (!result) return res.status(500).json({ error: 'Erro inesperado ao analisar o jogo.' });
+    if (result.error) {
+      return res.status(500).json(result);
+    }
     
     if (username) {
       if (!userHistories[username]) userHistories[username] = [];
@@ -275,7 +300,10 @@ async function startServer() {
 
   app.get('/api/analyze/:appid', async (req, res) => {
     const result = await analyzeGame(req.params.appid);
-    if (!result) return res.status(500).json({ error: 'Erro ao analisar o jogo.' });
+    if (!result) return res.status(500).json({ error: 'Erro inesperado ao analisar o jogo.' });
+    if (result.error) {
+      return res.status(500).json(result);
+    }
     if (!result.hasCards) return res.json(result);
     return res.json(result);
   });

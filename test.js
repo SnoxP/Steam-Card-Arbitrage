@@ -1,2 +1,11 @@
-const url = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://steamcommunity.com/market/search?appid=753&category_753_Game[]=tag_app_3751950&category_753_item_class[]=tag_item_class_2');
-fetch(url).then(r => r.json()).then(d => console.log(d.contents.match(/searchResults_total">([\d,]+)/)));
+const http = require('http');
+async function test() {
+  const fetch = (await import('node-fetch')).default;
+  const res = await fetch('http://localhost:3000/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ appId: "508900" })
+  });
+  console.log(await res.text());
+}
+test();
