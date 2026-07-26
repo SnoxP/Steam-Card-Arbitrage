@@ -142,6 +142,8 @@ async function startServer() {
   const allAnalyzedAppIds = new Set<string>();
   const userHistories: Record<string, any[]> = {};
 
+  let forceRestartScan = false;
+
   // Background scanner to maintain cache without rate limits
   async function runBackgroundScanner() {
     if (isScanning) return;
@@ -167,6 +169,12 @@ async function startServer() {
       console.log(`Starting scan of ${scanList.length} games...`);
 
       for (const game of scanList) {
+        if (forceRestartScan) {
+          console.log('Scan manually restarted.');
+          forceRestartScan = false;
+          break; // break inner loop to fetch new list
+        }
+
         gamesScannedTotal++;
         try {
           const currentAppId = typeof game === 'string' ? game : game.appId;
@@ -224,6 +232,12 @@ async function startServer() {
   
   // Start the background scanner automatically
   runBackgroundScanner();
+
+  app.post('/api/restart-scan', (req, res) => {
+    forceRestartScan = true;
+    gamesScannedTotal = 0; // Reset scanned counter optionally
+    res.json({ ok: true, message: 'Scan restarted' });
+  });
 
   app.post('/api/analyze', async (req, res) => {
     const { appId, username } = req.body;

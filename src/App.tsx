@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Info,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import type { AnalysisResult } from "./types";
 
@@ -128,6 +129,20 @@ export default function App() {
     if (urlMatch) return urlMatch[1];
 
     return null;
+  };
+
+  const [isRestartingScan, setIsRestartingScan] = useState(false);
+
+  const handleRestartScan = async () => {
+    if (isRestartingScan) return;
+    setIsRestartingScan(true);
+    try {
+      await fetch("/api/restart-scan", { method: "POST" });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTimeout(() => setIsRestartingScan(false), 1000);
+    }
   };
 
   const handleAnalyze = async (gameInput: string) => {
@@ -367,6 +382,21 @@ export default function App() {
                       <h2 className="text-2xl font-bold text-white tracking-tight">
                         Oportunidades Ao Vivo
                       </h2>
+                      <button
+                        onClick={handleRestartScan}
+                        disabled={isRestartingScan}
+                        title="Reiniciar processo de verificação global"
+                        className="ml-2 p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw
+                          size={18}
+                          className={
+                            isRestartingScan
+                              ? "animate-spin text-violet-400"
+                              : ""
+                          }
+                        />
+                      </button>
                     </div>
                     {scanStats && scanStats.currentScanSize > 0 && (
                       <div className="text-xs text-violet-400/80 bg-violet-500/10 px-3 py-1.5 rounded-full border border-violet-500/20 font-medium">
