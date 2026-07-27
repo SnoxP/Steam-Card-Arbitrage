@@ -205,6 +205,12 @@ async function startServer() {
           const currentAppId = typeof game === 'string' ? game : game.appId;
           const data = await analyzeGame(game);
           
+          if (data && data.error && data.error.includes('429')) {
+             console.log('Rate limit hit during background scan. Pausing for 5 minutes...');
+             await new Promise(r => setTimeout(r, 300000)); // wait 5 minutes
+             continue;
+          }
+
           if (data && !data.error) {
             // Update user histories if the game is there
             for (const username in userHistories) {
@@ -245,8 +251,8 @@ async function startServer() {
         topGamesCache.sort((a, b) => (b.expectedDropValueNet - b.gamePrice) - (a.expectedDropValueNet - a.gamePrice));
         historyCache.sort((a, b) => new Date(b.foundAt).getTime() - new Date(a.foundAt).getTime());
         
-        // Wait 1.5 seconds between each game to avoid Steam Market rate limits
-        await new Promise(r => setTimeout(r, 1500));
+        // Wait 10 seconds between each game to avoid Steam Market rate limits
+        await new Promise(r => setTimeout(r, 10000));
       }
       
       console.log('Finished full scan cycle. Restarting fetch...');

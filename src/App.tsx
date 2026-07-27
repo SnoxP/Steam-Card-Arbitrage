@@ -145,6 +145,12 @@ export default function App() {
     }
   };
 
+  const handleViewCached = (game: AnalysisResult) => {
+    setResult(game);
+    setError(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleAnalyze = async (gameInput: string) => {
     const appId = parseAppId(gameInput);
     if (!appId) {
@@ -217,9 +223,12 @@ export default function App() {
               <div className="w-px h-4 bg-zinc-800 mx-2"></div>
               <button
                 onClick={() => {
-                  document
-                    .getElementById("historico")
-                    ?.scrollIntoView({ behavior: "smooth" });
+                  setResult(null);
+                  setTimeout(() => {
+                    document
+                      .getElementById("historico")
+                      ?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
                 className="text-sm text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1.5 font-medium"
               >
@@ -427,10 +436,7 @@ export default function App() {
                         <div
                           key={game.appId}
                           className="bg-zinc-900 border border-emerald-500/30 rounded-lg p-4 flex gap-4 hover:bg-zinc-800 transition-all cursor-pointer shadow-xl  group"
-                          onClick={() => {
-                            setInput(game.appId);
-                            handleAnalyze(game.appId);
-                          }}
+                          onClick={() => handleViewCached(game)}
                         >
                           <div className="overflow-hidden rounded-md w-24 shrink-0">
                             <img
@@ -501,10 +507,7 @@ export default function App() {
                       <div
                         key={game.appId}
                         className={`bg-zinc-900 border ${game.isProfitable ? "border-emerald-500/20" : "border-zinc-800"} rounded-lg p-4 flex gap-4 cursor-pointer hover:bg-zinc-800 transition-all shadow-xl  group`}
-                        onClick={() => {
-                          setInput(game.appId);
-                          handleAnalyze(game.appId);
-                        }}
+                        onClick={() => handleViewCached(game)}
                       >
                         <div className="overflow-hidden rounded-md w-16 shrink-0 shadow-md">
                           <img
@@ -567,10 +570,7 @@ export default function App() {
                       <div
                         key={game.appId}
                         className={`bg-zinc-900 border ${game.isProfitable ? "border-emerald-500/20" : "border-zinc-800"} rounded-lg p-4 flex gap-4 cursor-pointer hover:bg-zinc-800 transition-all shadow-xl  group`}
-                        onClick={() => {
-                          setInput(game.appId);
-                          handleAnalyze(game.appId);
-                        }}
+                        onClick={() => handleViewCached(game)}
                       >
                         <div className="overflow-hidden rounded-md w-16 shrink-0 shadow-md">
                           <img
