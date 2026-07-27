@@ -108,7 +108,7 @@ async function startServer() {
       } catch (e) {}
 
       const marketUrl = `https://steamcommunity.com/market/search/render/?query=&start=0&count=50&search_descriptions=0&sort_column=price&sort_dir=asc&appid=753&category_753_Game%5B%5D=tag_app_${appId}&category_753_item_class%5B%5D=tag_item_class_2&norender=1&currency=1`;
-      const marketRes = await fetch(marketUrl, { headers: { 'User-Agent': 'curl/8.5.0' }});
+      const marketRes = await fetch(marketUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }});
       if (!marketRes.ok) {
         console.error('Market API non-OK response', marketRes.status, marketUrl);
         return { error: `Mercado da Steam indisponível ou rate limit ativo. Status: ${marketRes.status}` };
@@ -205,8 +205,8 @@ async function startServer() {
           const currentAppId = typeof game === 'string' ? game : game.appId;
           const data = await analyzeGame(game);
           
-          if (data && data.error && data.error.includes('429')) {
-             console.log('Rate limit hit during background scan. Pausing for 5 minutes...');
+          if (data && data.error && (data.error.includes('429') || data.error.includes('403'))) {
+             console.log('Rate limit or block hit during background scan. Pausing for 5 minutes...');
              await new Promise(r => setTimeout(r, 300000)); // wait 5 minutes
              continue;
           }
@@ -251,8 +251,8 @@ async function startServer() {
         topGamesCache.sort((a, b) => (b.expectedDropValueNet - b.gamePrice) - (a.expectedDropValueNet - a.gamePrice));
         historyCache.sort((a, b) => new Date(b.foundAt).getTime() - new Date(a.foundAt).getTime());
         
-        // Wait 10 seconds between each game to avoid Steam Market rate limits
-        await new Promise(r => setTimeout(r, 10000));
+        // Wait 3 seconds between each game to avoid Steam Market rate limits
+        await new Promise(r => setTimeout(r, 3000));
       }
       
       console.log('Finished full scan cycle. Restarting fetch...');
